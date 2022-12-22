@@ -2,10 +2,10 @@ import React from "react";
 import * as THREE from "three";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
 import { useFrame } from "@react-three/fiber";
-import { useAppState, useHotkeys, useTiles } from "@/hooks";
-import Tile from "@/components/tile";
 import { OFFSET_Z } from "@/consts";
+import { useAppState, useHotkeys, useTiles } from "@/hooks";
 import Points from "@/components/points";
+import Tiles from "@/components/tiles";
 
 type Props = {
   id: number;
@@ -13,34 +13,58 @@ type Props = {
 
 export default function App({ id }: Props) {
   const zoom = useAppState((state) => state.zoom);
-  const focus = useAppState((state) => state.focus);
+  const setZoom = useAppState((state) => state.setZoom);
   const rotation = useAppState((state) => state.rotation);
   const sizes = useAppState((state) => state.sizes);
-  const grid = useAppState((state) => state.grid);
 
   useHotkeys();
-
   useTiles(id);
+
+  const zoomDistances = React.useMemo(() => {
+    const zoomDistances: number[] = [OFFSET_Z];
+    for (let i = 1, length = sizes.length; i < length; i++) {
+      zoomDistances.push(zoomDistances[zoomDistances.length - 1] / 2);
+    }
+    return zoomDistances;
+  }, [sizes]);
+
+  const scales = React.useMemo(() => {
+    const scales: number[] = [1];
+    for (let i = 1, length = sizes.length; i < length; i++) {
+      scales.push(scales[scales.length - 1] / 2);
+    }
+    return scales;
+  }, [sizes]);
+
+  function closestZoomDistance(
+    zoomDistances: number[],
+    camera: THREE.Camera
+  ): [distance: number, index: number] {
+    let zoomDistanceIndex = 0;
+    for (let i = 0, length = zoomDistances.length; i < length; i++) {
+      const index = Math.max(zoomDistances.length - 1, i + 1);
+      const zoomDistance = zoomDistances[i];
+      const nextZoomDistance = zoomDistances[index];
+      if (
+        camera.position.z <= zoomDistance &&
+        camera.position.z >= nextZoomDistance
+      ) {
+        zoomDistanceIndex = i;
+      }
+    }
+    if (camera.position.z === zoomDistances[zoomDistances.length - 1]) {
+      zoomDistanceIndex = zoomDistances.length - 1;
+    }
+    return [zoomDistances[zoomDistanceIndex], zoomDistanceIndex];
+  }
 
   useFrame(({ camera }) => {
     if (sizes.length === 0) return;
     camera.rotation.set(0, 0, THREE.MathUtils.degToRad(rotation));
-    if (camera.position.z <= 10 / Math.pow(2, zoom + 1)) {
-      // console.log("increment zoom");
+    const [, zoomDistanceIndex] = closestZoomDistance(zoomDistances, camera);
+    if (zoomDistanceIndex !== zoom) {
+      setZoom(zoomDistanceIndex);
     }
-    const max = OFFSET_Z;
-    const min = OFFSET_Z / Math.pow(2, sizes.length - 1);
-    const z = Math.ceil(
-      THREE.MathUtils.mapLinear(
-        camera.position.z,
-        max,
-        min,
-        0,
-        sizes.length - 1
-      )
-    );
-    // const e = OFFSET_Z / Math.pow(2, OFFSET_Z - camera.position.z);
-    // console.log(e);
   });
 
   if (sizes.length === 0) {
@@ -65,31 +89,20 @@ export default function App({ id }: Props) {
           RIGHT: THREE.MOUSE.RIGHT,
         }}
         touches={{ ONE: THREE.TOUCH.PAN, TWO: THREE.TOUCH.PAN }}
-        minDistance={1}
+        minDistance={zoomDistances[zoomDistances.length - 1]}
         maxDistance={OFFSET_Z}
         zoomSpeed={0.25}
       />
 
-      <group
-        position-x={sizes[zoom].width * -0.5}
-        position-y={sizes[zoom].height * 0.5}
-      >
-        {grid[zoom][focus].map((cols, rowIndex) => {
-          return (
-            <React.Fragment key={rowIndex}>
-              {cols.map((tile, tileIndex) => {
-                return (
-                  <React.Fragment key={tileIndex}>
-                    <React.Suspense>
-                      <Tile id={id} tile={tile} />
-                    </React.Suspense>
-                  </React.Fragment>
-                );
-              })}
-            </React.Fragment>
-          );
-        })}
-      </group>
+      {sizes.map((size, index) => {
+        if (index !== zoom) return null;
+        const scale = scales[index];
+        return (
+          <group key={index} scale={scale}>
+            <Tiles id={id} zoom={index} />
+          </group>
+        );
+      })}
 
       <Points />
     </React.Fragment>
