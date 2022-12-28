@@ -1,7 +1,7 @@
 import React from "react";
 import create from "zustand";
 import { AppState, Grid, Size } from "@/types";
-import { SCALE } from "@/consts";
+import { CDN_URL, SCALE } from "@/consts";
 
 export const useAppState = create<AppState>((set) => {
   return {
@@ -60,7 +60,7 @@ export function useTiles(id: number) {
   const setGrid = useAppState((state) => state.setGrid);
 
   React.useEffect(() => {
-    fetch(`https://storage.finervision.com/eha-website/${id}/tiles.json`)
+    fetch(`${CDN_URL}/${id}/tiles.json`)
       .then((res) => res.json())
       .then((tiles) => {
         const sizes: Size[] = [];

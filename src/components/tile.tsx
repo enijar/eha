@@ -5,6 +5,7 @@ import { useFrame } from "@react-three/fiber";
 import { useTexture } from "@react-three/drei";
 import { useAppState } from "@/hooks";
 import { Tile as TileType } from "@/types";
+import {CDN_URL} from "@/consts";
 
 type Props = {
   id: number;
@@ -25,6 +26,7 @@ export default function Tile({ id, tile }: Props) {
     return [x, y, 0];
   }, [tile]);
 
+  // @todo check if this tile is visible by the camera
   useFrame(({ camera }) => {
     const mesh = meshRef.current;
     if (mesh === null) return;
@@ -36,12 +38,11 @@ export default function Tile({ id, tile }: Props) {
       )
     );
     const visible = frustum.intersectsObject(mesh);
-
-    console.log(visible);
+    // console.log(visible);
   });
 
   const texture = useTexture(
-    `https://storage.finervision.com/eha-website/${id}/${zoom}-${tile.col}-${tile.row}-${focus}.jpg`
+    `${CDN_URL}/${id}/${zoom}-${tile.col}-${tile.row}-${focus}.jpg`
   );
 
   return (
