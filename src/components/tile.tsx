@@ -1,9 +1,8 @@
 import React from "react";
 import * as THREE from "three";
 import { useFrame } from "@react-three/fiber";
-import { useTexture } from "@react-three/drei";
 import { useAppState } from "@/hooks";
-import { AppState, Tile as TileType } from "@/types";
+import { Tile as TileType } from "@/types";
 import { CDN_URL } from "@/consts";
 
 const textureLoader = new THREE.TextureLoader();
@@ -12,23 +11,6 @@ type Props = {
   id: number;
   tile: TileType;
 };
-
-function tileInViewport(
-  tile: TileType,
-  box: THREE.Box3,
-  mesh: THREE.Mesh,
-  viewport: AppState["viewport"]
-): boolean {
-  // return true;
-  // if (mesh.geometry.boundingBox === null) {
-  //   mesh.geometry.computeBoundingBox();
-  // }
-  // if (mesh.geometry.boundingBox === null) {
-  //   return false;
-  // }
-  // console.log(mesh.geometry.boundingBox.min.x, viewport.x);
-  return viewport.box.intersectsBox(box);
-}
 
 export default function Tile({ id, tile }: Props) {
   const zoom = useAppState((state) => state.zoom);
@@ -58,12 +40,14 @@ export default function Tile({ id, tile }: Props) {
 
     box.setFromObject(mesh);
 
-    const { viewport } = useAppState.getState();
-
-    const visible = tileInViewport(tile, box, mesh, viewport);
+    const visible = useAppState.getState().viewport.box.intersectsBox(box);
     mesh.visible = visible;
     setVisible(visible);
   });
+
+  React.useEffect(() => {
+    console.log(`visible(${tile.row},${tile.col}): ${visible}`);
+  }, [tile.row, tile.col, visible]);
 
   React.useEffect(() => {
     if (!visible) return;

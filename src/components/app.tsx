@@ -66,17 +66,19 @@ export default function App({ id }: Props) {
     const viewportMesh = viewportMeshRef.current;
     if (viewportMesh === null) return;
 
-    viewportMesh.position.copy(camera.position);
-    viewportMesh.position.z = 0;
-
     if (sizes.length === 0) return;
     camera.rotation.set(0, 0, THREE.MathUtils.degToRad(rotation));
     const [, zoomDistanceIndex] = closestZoomDistance(zoomDistances, camera);
     if (zoomDistanceIndex !== zoom) {
       setZoom(zoomDistanceIndex);
     }
+
     const { viewport, setViewport } = useAppState.getState();
-    viewport.box.setFromObject(viewportMesh);
+    const z = viewportMesh.position.z;
+    viewportMesh.position.z = 0;
+    // @todo optimise this by using one object instead of duping it each time
+    viewport.box.setFromObject(viewportMesh.clone());
+    viewportMesh.position.z = z;
     setViewport({
       ...viewport,
       x: camera.position.x,
@@ -97,7 +99,23 @@ export default function App({ id }: Props) {
         makeDefault
         position={[0, 0, OFFSET_Z]}
         rotation-z={THREE.MathUtils.degToRad(rotation)}
-      />
+      >
+        {/* Used to calculate if a given tile is visible on screen */}
+        <mesh
+          ref={viewportMeshRef}
+          visible={false}
+          position={[0, 0, -OFFSET_Z]}
+        >
+          <planeGeometry args={[viewportBox.width, viewportBox.height]} />
+          <meshBasicMaterial
+            color="crimson"
+            depthWrite={false}
+            depthTest={false}
+            transparent={true}
+            opacity={0.3}
+          />
+        </mesh>
+      </PerspectiveCamera>
       <OrbitControls
         makeDefault
         enableRotate={false}
@@ -124,18 +142,6 @@ export default function App({ id }: Props) {
       })}
 
       <Points />
-
-      {/* Used to calculate if a given tile is visible on screen */}
-      <mesh ref={viewportMeshRef} visible={false}>
-        <planeGeometry args={[viewportBox.width, viewportBox.height]} />
-        <meshBasicMaterial
-          color="crimson"
-          depthWrite={false}
-          depthTest={false}
-          transparent={true}
-          opacity={0.3}
-        />
-      </mesh>
     </React.Fragment>
   );
 }
