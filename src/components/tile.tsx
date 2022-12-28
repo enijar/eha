@@ -6,6 +6,8 @@ import { useAppState } from "@/hooks";
 import { AppState, Tile as TileType } from "@/types";
 import { CDN_URL } from "@/consts";
 
+const textureLoader = new THREE.TextureLoader();
+
 type Props = {
   id: number;
   tile: TileType;
@@ -32,7 +34,10 @@ export default function Tile({ id, tile }: Props) {
   const zoom = useAppState((state) => state.zoom);
   const focus = useAppState((state) => state.focus);
 
-  const meshRef = React.useRef<THREE.Mesh | null>(null);
+  const meshRef = React.useRef<THREE.Mesh<
+    THREE.PlaneGeometry,
+    THREE.MeshBasicMaterial
+  > | null>(null);
 
   const position = React.useMemo<[x: number, y: number, z: number]>(() => {
     const x = tile.x + tile.w * 0.5;
@@ -43,6 +48,8 @@ export default function Tile({ id, tile }: Props) {
   const box = React.useMemo(() => {
     return new THREE.Box3();
   }, []);
+
+  const [visible, setVisible] = React.useState(false);
 
   // @todo check if this tile is visible by the camera
   useFrame(({ camera }) => {
@@ -55,33 +62,27 @@ export default function Tile({ id, tile }: Props) {
 
     const visible = tileInViewport(tile, box, mesh, viewport);
     mesh.visible = visible;
-
-    console.log(`visible(${tile.col}-${tile.row}): ${visible}`);
-
-    // calc bounding box
-    // test if intersects with viewport
-
-    // @todo old, not accurate, remove when a more accurate solution is implemented
-    // frustum.setFromProjectionMatrix(
-    //   new THREE.Matrix4().multiplyMatrices(
-    //     camera.projectionMatrix,
-    //     camera.matrixWorldInverse
-    //   )
-    // );
-    // const visible = frustum.intersectsObject(mesh);
-    // if (visible) {
-    //   // console.log(`visible: ${tile.col}-${tile.row}`);
-    // }
+    setVisible(visible);
   });
 
-  const texture = useTexture(
-    `${CDN_URL}/${id}/${zoom}-${tile.col}-${tile.row}-${focus}.jpg`
-  );
+  React.useEffect(() => {
+    if (!visible) return;
+    textureLoader
+      .loadAsync(
+        `${CDN_URL}/${id}/${zoom}-${tile.col}-${tile.row}-${focus}.jpg`
+      )
+      .then((texture) => {
+        const mesh = meshRef.current;
+        if (mesh === null) return;
+        mesh.material.map = texture;
+        mesh.material.needsUpdate = true;
+      });
+  }, [visible, id, zoom, tile, focus]);
 
   return (
     <mesh position={position} ref={meshRef}>
       <planeGeometry args={[tile.w, tile.h]} />
-      <meshBasicMaterial map={texture} depthWrite={false} depthTest={false} />
+      <meshBasicMaterial depthWrite={false} depthTest={false} />
     </mesh>
   );
 }
