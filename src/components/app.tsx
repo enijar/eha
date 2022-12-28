@@ -1,7 +1,7 @@
 import React from "react";
 import * as THREE from "three";
 import { OrbitControls, PerspectiveCamera } from "@react-three/drei";
-import { useFrame } from "@react-three/fiber";
+import { useFrame, useThree } from "@react-three/fiber";
 import { OFFSET_Z } from "@/consts";
 import { useAppState, useHotkeys, useTiles } from "@/hooks";
 import Points from "@/components/points";
@@ -16,6 +16,8 @@ export default function App({ id }: Props) {
   const setZoom = useAppState((state) => state.setZoom);
   const rotation = useAppState((state) => state.rotation);
   const sizes = useAppState((state) => state.sizes);
+
+  const viewportMeshRef = React.useRef<THREE.Mesh | null>(null);
 
   useHotkeys();
   useTiles(id);
@@ -58,13 +60,30 @@ export default function App({ id }: Props) {
     return [zoomDistances[zoomDistanceIndex], zoomDistanceIndex];
   }
 
+  const viewportBox = useThree((state) => state.viewport);
+
   useFrame(({ camera }) => {
+    const viewportMesh = viewportMeshRef.current;
+    if (viewportMesh === null) return;
+
+    viewportMesh.position.copy(camera.position);
+    viewportMesh.position.z = 0;
+
     if (sizes.length === 0) return;
     camera.rotation.set(0, 0, THREE.MathUtils.degToRad(rotation));
     const [, zoomDistanceIndex] = closestZoomDistance(zoomDistances, camera);
     if (zoomDistanceIndex !== zoom) {
       setZoom(zoomDistanceIndex);
     }
+    const { viewport, setViewport } = useAppState.getState();
+    viewport.box.setFromObject(viewportMesh);
+    setViewport({
+      ...viewport,
+      x: camera.position.x,
+      y: camera.position.y,
+      width: viewportBox.width,
+      height: viewportBox.height,
+    });
   });
 
   if (sizes.length === 0) {
@@ -105,6 +124,18 @@ export default function App({ id }: Props) {
       })}
 
       <Points />
+
+      {/* Used to calculate if a given tile is visible on screen */}
+      <mesh ref={viewportMeshRef} visible={false}>
+        <planeGeometry args={[viewportBox.width, viewportBox.height]} />
+        <meshBasicMaterial
+          color="crimson"
+          depthWrite={false}
+          depthTest={false}
+          transparent={true}
+          opacity={0.3}
+        />
+      </mesh>
     </React.Fragment>
   );
 }

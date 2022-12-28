@@ -1,10 +1,21 @@
 import React from "react";
+import * as THREE from "three";
 import create from "zustand";
 import { AppState, Grid, Size } from "@/types";
 import { CDN_URL, SCALE } from "@/consts";
 
 export const useAppState = create<AppState>((set) => {
   return {
+    viewport: {
+      x: 0,
+      y: 0,
+      width: 0,
+      height: 0,
+      box: new THREE.Box3(),
+    },
+    setViewport(viewport) {
+      set({ viewport });
+    },
     zoom: 0,
     setZoom(zoom) {
       set({ zoom });

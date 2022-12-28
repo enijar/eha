@@ -1,4 +1,14 @@
+import type { Box3 } from "three";
+
 export type AppState = {
+  viewport: {
+    x: number;
+    y: number;
+    width: number;
+    height: number;
+    box: Box3;
+  };
+  setViewport: (viewport: AppState["viewport"]) => void;
   zoom: number;
   setZoom: (zoom: AppState["zoom"]) => void;
   focus: number;
