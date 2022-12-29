@@ -17,8 +17,6 @@ export default function App({ id }: Props) {
   const rotation = useAppState((state) => state.rotation);
   const sizes = useAppState((state) => state.sizes);
 
-  const viewportMeshRef = React.useRef<THREE.Mesh | null>(null);
-
   useHotkeys();
   useTiles(id);
 
@@ -62,11 +60,24 @@ export default function App({ id }: Props) {
 
   const viewportBox = useThree((state) => state.viewport);
 
-  useFrame(({ camera }) => {
-    const viewportMesh = viewportMeshRef.current;
-    if (viewportMesh === null) return;
+  const viewportPlane = React.useMemo(() => {
+    const bleed = 1.5; // ratio where 1 = no bleed, 2 = 2x viewport bleed, etc.
+    return new THREE.Mesh(
+      new THREE.PlaneGeometry(
+        viewportBox.width * bleed,
+        viewportBox.height * bleed
+      ),
+      new THREE.MeshBasicMaterial({
+        color: "crimson",
+        transparent: true,
+        opacity: 0.5,
+      })
+    );
+  }, [viewportBox.width, viewportBox.height]);
 
+  useFrame(({ camera }) => {
     if (sizes.length === 0) return;
+
     camera.rotation.set(0, 0, THREE.MathUtils.degToRad(rotation));
     const [, zoomDistanceIndex] = closestZoomDistance(zoomDistances, camera);
     if (zoomDistanceIndex !== zoom) {
@@ -74,11 +85,13 @@ export default function App({ id }: Props) {
     }
 
     const { viewport, setViewport } = useAppState.getState();
-    const z = viewportMesh.position.z;
-    viewportMesh.position.z = 0;
-    // @todo optimise this by using one object instead of duping it each time
-    viewport.box.setFromObject(viewportMesh.clone());
-    viewportMesh.position.z = z;
+
+    viewportPlane.position.copy(camera.position);
+    viewportPlane.position.z = 0;
+    const scale = camera.position.z / OFFSET_Z;
+    viewportPlane.scale.set(scale, scale, scale);
+    viewport.box.setFromObject(viewportPlane);
+
     setViewport({
       ...viewport,
       x: camera.position.x,
@@ -95,27 +108,12 @@ export default function App({ id }: Props) {
   return (
     <React.Fragment>
       <color args={["#333333"]} attach="background" />
+      <primitive object={viewportPlane} visible={false} />
       <PerspectiveCamera
         makeDefault
         position={[0, 0, OFFSET_Z]}
         rotation-z={THREE.MathUtils.degToRad(rotation)}
-      >
-        {/* Used to calculate if a given tile is visible on screen */}
-        <mesh
-          ref={viewportMeshRef}
-          visible={false}
-          position={[0, 0, -OFFSET_Z]}
-        >
-          <planeGeometry args={[viewportBox.width, viewportBox.height]} />
-          <meshBasicMaterial
-            color="crimson"
-            depthWrite={false}
-            depthTest={false}
-            transparent={true}
-            opacity={0.3}
-          />
-        </mesh>
-      </PerspectiveCamera>
+      />
       <OrbitControls
         makeDefault
         enableRotate={false}
